@@ -306,7 +306,7 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
 <body>
 
 <!-- ============================================================
-     LOGIN GATE (client-side soft gate — see API & Sync tab)
+     LOGIN GATE (real auth — Firebase Authentication)
      ============================================================ -->
 <div id="loginGate">
   <div class="gate-card">
@@ -314,15 +314,15 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
     <h1>Content Dashboard</h1>
     <p class="sub">Sign in to manage the Gamil Mamdouh portfolio content.</p>
     <div class="field">
-      <label for="gatePass">Passphrase</label>
-      <input id="gatePass" type="password" placeholder="Enter passphrase" autocomplete="off">
+      <label for="gateEmail">Email</label>
+      <input id="gateEmail" type="email" placeholder="you@example.com" autocomplete="username">
     </div>
-    <button class="btn btn-primary btn-block" id="gateSubmit">Unlock dashboard</button>
-    <p id="gateError">Incorrect passphrase.</p>
-    <div class="gate-warning">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-      <span>This is a simple client-side lock, not real authentication — anyone with the file and passphrase can open it. Don't host this dashboard somewhere public without adding proper server-side auth. Default passphrase is <strong class="mono">gamil-admin</strong> — change <span class="mono">DASH_PASSPHRASE</span> near the top of the script before using this for real.</span>
+    <div class="field">
+      <label for="gatePass">Password</label>
+      <input id="gatePass" type="password" placeholder="Enter password" autocomplete="current-password">
     </div>
+    <button class="btn btn-primary btn-block" id="gateSubmit">Sign in</button>
+    <p id="gateError">Incorrect email or password.</p>
   </div>
 </div>
 
@@ -438,19 +438,19 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
           <div class="stat-card"><strong data-stat="services">0</strong><span>SERVICES</span></div>
         </div>
 
-        <div class="panel-head"><div><h3>Getting this connected</h3><p>Three steps to take this dashboard from "editing locally" to "actually driving the live site."</p></div></div>
+        <div class="panel-head"><div><h3>How this stays in sync</h3><p>This dashboard and the live portfolio share one Firestore document.</p></div></div>
         <div class="setup-list">
           <div class="setup-item">
             <span class="setup-num">1</span>
-            <div><h4>Edit your content here</h4><p>Everything you change in Journey, Skills, Projects, Services, Certificates and Stats is saved automatically to this browser as you go — nothing is lost on refresh.</p></div>
+            <div><h4>Edit your content here</h4><p>Everything you change in Journey, Skills, Projects, Services, Certificates and Stats saves to this browser instantly — nothing is lost on refresh.</p></div>
           </div>
           <div class="setup-item">
             <span class="setup-num">2</span>
-            <div><h4>Optional: connect a cloud API</h4><p>Open <strong>API &amp; Sync</strong> to link a free JSON storage bin so this data lives outside your browser and can, in future, be fetched by the portfolio itself. Instructions for getting an API key are on that tab.</p></div>
+            <div><h4>Auto-synced to Firestore</h4><p>A moment after each edit, the same data pushes to Firebase Firestore automatically — see the sync indicator at the top right, or open <strong>API &amp; Sync</strong> for manual push/pull.</p></div>
           </div>
           <div class="setup-item">
             <span class="setup-num">3</span>
-            <div><h4>Publish to the portfolio</h4><p>The portfolio's <code class="mono">index.html</code> currently reads content from a hard-coded <code class="mono">DATA</code> object, and per your instructions it hasn't been modified. Go to <strong>Export / Import</strong>, copy the JSON, and paste it over the <code class="mono">DATA</code> object in the portfolio's <code class="mono">&lt;script&gt;</code> tag — or wire the portfolio to <code class="mono">fetch()</code> the API bin directly (snippet provided on the API tab).</p></div>
+            <div><h4>The portfolio reads it live</h4><p><code class="mono">index.html</code> reads the same Firestore document on every page load — no copy/pasting JSON, no extra setup on that end.</p></div>
           </div>
         </div>
       </section>
@@ -564,49 +564,18 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
 
       <!-- API & SYNC -->
       <section class="panel" data-panel="api">
-        <div class="panel-head"><div><h3>API &amp; Sync</h3><p>Connect a free cloud JSON store so this dashboard's data lives outside the browser.</p></div></div>
+        <div class="panel-head"><div><h3>API &amp; Sync</h3><p>This dashboard reads and writes Firebase Firestore — the same document <code class="mono">index.html</code> reads on the live portfolio.</p></div></div>
 
-        <div class="two-col">
-          <div>
-            <h4 style="font-size:.92rem;margin-bottom:12px;color:var(--electric-blue-bright)">1 · Get an API key (jsonbin.io)</h4>
-            <div class="setup-list">
-              <div class="setup-item"><span class="setup-num">1</span><div><p>Go to <strong class="mono">jsonbin.io</strong> and create a free account.</p></div></div>
-              <div class="setup-item"><span class="setup-num">2</span><div><p>Open <strong>Account → API Keys</strong> and copy your <strong class="mono">X-MASTER-KEY</strong>. That's the API key — paste it below.</p></div></div>
-              <div class="setup-item"><span class="setup-num">3</span><div><p>Paste the key below, then click <strong>Create new bin</strong> to generate storage and auto-fill the Bin ID — or paste in an existing Bin ID.</p></div></div>
-              <div class="setup-item"><span class="setup-num">4</span><div><p>Use <strong>Push to API</strong> whenever you want the cloud copy to match what's in this dashboard, or <strong>Pull from API</strong> to load the cloud copy in.</p></div></div>
-            </div>
-          </div>
-          <div>
-            <h4 style="font-size:.92rem;margin-bottom:12px;color:var(--electric-blue-bright)">2 · Connect</h4>
-            <div class="field"><label>API key (X-Master-Key)</label><input type="password" id="api_key" placeholder="Paste your jsonbin.io master key"></div>
-            <div class="field"><label>Bin ID</label><input type="text" id="api_binId" placeholder="Paste an existing bin ID, or create one"></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-              <button class="btn btn-ghost btn-sm" id="createBinBtn">Create new bin</button>
-              <button class="btn btn-ghost btn-sm" id="saveApiBtn">Save settings</button>
-              <button class="btn btn-ghost btn-sm" id="testApiBtn">Test connection</button>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" id="pushApiBtn">Push to API</button>
-              <button class="btn btn-primary btn-sm" id="pullApiBtn">Pull from API</button>
-            </div>
-            <div class="gate-warning" style="margin-top:20px">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-              <span>This key is stored in this browser's local storage and sent from client-side JavaScript — visible to anyone who opens dev tools on this device. Fine for a personal, low-stakes content bin; don't reuse this key anywhere sensitive.</span>
-            </div>
-          </div>
+        <div class="setup-list">
+          <div class="setup-item"><span class="setup-num">1</span><div><h4>Every edit auto-syncs</h4><p>Changes save to this browser immediately, then push to Firestore automatically ~700ms after you stop editing (debounced, so rapid changes collapse into one request).</p></div></div>
+          <div class="setup-item"><span class="setup-num">2</span><div><h4>Only signed-in accounts can write</h4><p>Firestore Security Rules require a valid sign-in (see the login screen) to write this document. Anyone — including portfolio visitors — can read it, but only accounts added under Firebase Authentication → Users can change it.</p></div></div>
+          <div class="setup-item"><span class="setup-num">3</span><div><h4>Manage access</h4><p>Add or remove who can sign in to this dashboard from the <a href="https://console.firebase.google.com/project/gamilport-admin/authentication/users" target="_blank" rel="noopener" style="color:var(--electric-blue-bright)">Firebase Console → Authentication → Users</a>.</p></div></div>
         </div>
 
-        <h4 style="font-size:.92rem;margin:28px 0 10px;color:var(--electric-blue-bright)">3 · Making the portfolio consume it (optional, do this yourself)</h4>
-        <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">The public portfolio file wasn't modified, so it still reads from its own hard-coded <code class="mono">DATA</code> object. To make it live-sync from this API, replace that object's declaration in the portfolio's <code class="mono">&lt;script&gt;</code> with something like:</p>
-        <pre class="code-block">let DATA = {};
-async function loadData(){
-  const res = await fetch('https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest', {
-    headers: { 'X-Master-Key': 'YOUR_API_KEY', 'X-Bin-Meta': 'false' }
-  });
-  DATA = await res.json();
-  // then call the existing renderEducation(), renderSkills(), etc.
-}
-loadData();</pre>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
+          <button class="btn btn-primary btn-sm" id="pushFirestoreBtn">Push now</button>
+          <button class="btn btn-ghost btn-sm" id="pullFirestoreBtn">Pull latest</button>
+        </div>
       </section>
 
       <!-- EXPORT / IMPORT -->
@@ -651,19 +620,36 @@ loadData();</pre>
 
 <div class="toast-wrap" id="toastWrap"></div>
 
+<!-- Firebase (Auth + Firestore) -->
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore-compat.js"></script>
+
 <script>
+/* ============================================================
+   FIREBASE INIT
+   This config is not a secret — it's fine embedded in client
+   code. Real protection comes from Firestore Security Rules
+   (public read, signed-in write only) and from Authentication
+   requiring a real email/password sign-in below.
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDKccKQUuXMVNzBk9I-mKOCRAQkTHgklyI",
+  authDomain: "gamilport-admin.firebaseapp.com",
+  projectId: "gamilport-admin",
+  storageBucket: "gamilport-admin.firebasestorage.app",
+  messagingSenderId: "223009469627",
+  appId: "1:223009469627:web:5970f613bd1c1a9ccba59e",
+  measurementId: "G-VBSSGHG0NB"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const PORTFOLIO_DOC = db.collection('portfolio').doc('content');
 /* ============================================================
    CONFIG
    ============================================================ */
-const DASH_PASSPHRASE = 'gamil-admin'; // change before real use
-const STORAGE_KEY = 'gm_dashboard_data_v1';
-const CONFIG_KEY  = 'gm_dashboard_config_v1';
-const AUTH_KEY    = 'gm_dashboard_auth_v1';
-
-// Must match JSONBIN_BIN_ID in index.html — this is what actually
-// links the two files together. Pre-fills the Bin ID field below so
-// you only have to paste your Access Key to connect.
-const DEFAULT_BIN_ID = '6a7c5facda38895dfeda4195';
+const STORAGE_KEY = 'gm_dashboard_data_v1'; // local offline cache only
 
 /* ============================================================
    DEFAULT DATA — mirrors the portfolio's DATA object 1:1 so the
@@ -733,7 +719,6 @@ function defaultData(){
 }
 
 let DATA = null;
-let CONFIG = { apiKey:'', binId:'' };
 let syncState = 'local'; // local | synced | busy | error
 let activeProjectFilter = 'All';
 let activeCertFilter = 'All';
@@ -751,48 +736,40 @@ function toast(msg, type){
   setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(6px)'; t.style.transition='.25s'; setTimeout(()=>t.remove(),250); }, 3000);
 }
 function persistLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); setSync('local'); refreshCounts(); }
-function persistConfig(){ localStorage.setItem(CONFIG_KEY, JSON.stringify(CONFIG)); }
 function setSync(state){
   syncState = state;
   const dot = document.getElementById('syncDot');
   const label = document.getElementById('syncLabel');
   dot.className = 'sync-dot ' + (state==='busy'?'busy':state==='synced'?'synced':state==='error'?'error':'local');
-  label.textContent = state==='busy' ? 'Syncing…' : state==='synced' ? 'Synced to API' : state==='error' ? 'Sync error' : (CONFIG.apiKey && CONFIG.binId ? 'Saved locally' : 'Not connected');
+  label.textContent = state==='busy' ? 'Syncing…' : state==='synced' ? 'Synced to Firestore' : state==='error' ? 'Sync error' : 'Saved locally';
 }
 
 /* ============================================================
    AUTO-SYNC
    ------------------------------------------------------------
-   Every edit still saves to localStorage immediately (persistLocal,
-   so nothing is lost on refresh even offline), but it now ALSO
-   pushes to the JSONBin API automatically — that push is what was
-   previously missing, which is why edits used to stay local until
-   someone clicked "Push to API" by hand.
-
-   The push is debounced (700ms of no further edits) so rapid
-   changes, like reordering several items, collapse into a single
-   API request instead of firing one per click.
+   Every edit saves to localStorage immediately (persistLocal, so
+   nothing is lost on refresh even offline), then pushes to
+   Firestore automatically, debounced 700ms so rapid changes (like
+   reordering several items) collapse into a single write.
    ============================================================ */
 let autoSyncTimer = null;
-async function syncToApi(){
-  if(!(CONFIG.apiKey && CONFIG.binId)) return false;
+async function syncToFirestore(){
   setSync('busy');
   try{
-    await jsonbinRequest('PUT', exportableData());
+    await PORTFOLIO_DOC.set(exportableData());
     setSync('synced');
     return true;
   }catch(err){
     setSync('error');
-    toast('Auto-sync to API failed: ' + err.message, 'error');
+    toast('Auto-sync to Firestore failed: ' + err.message, 'error');
     return false;
   }
 }
 function commit(){
   persistLocal();
-  if(!(CONFIG.apiKey && CONFIG.binId)) return; // nothing to sync to yet — local only, as expected
   clearTimeout(autoSyncTimer);
   setSync('busy');
-  autoSyncTimer = setTimeout(syncToApi, 700);
+  autoSyncTimer = setTimeout(syncToFirestore, 700);
 }
 
 /* ============================================================
@@ -803,39 +780,42 @@ function boot(){
   DATA = savedData ? JSON.parse(savedData) : defaultData();
   if(!DATA.seo) DATA.seo = { title:'', desc:'', image:'' };
   if(DATA.profile && DATA.profile.photo === undefined) DATA.profile.photo = '';
-  const savedConfig = localStorage.getItem(CONFIG_KEY);
-  CONFIG = savedConfig ? JSON.parse(savedConfig) : { apiKey:'', binId:'' };
-  if(!CONFIG.binId) CONFIG.binId = DEFAULT_BIN_ID;
-
-  document.getElementById('api_key').value = CONFIG.apiKey || '';
-  document.getElementById('api_binId').value = CONFIG.binId || '';
   setSync('local');
-
   renderAll();
-
-  if(sessionStorage.getItem(AUTH_KEY) === '1'){ unlockApp(); }
 }
 
 document.getElementById('gateSubmit').addEventListener('click', attemptLogin);
 document.getElementById('gatePass').addEventListener('keydown', e => { if(e.key==='Enter') attemptLogin(); });
+document.getElementById('gateEmail').addEventListener('keydown', e => { if(e.key==='Enter') attemptLogin(); });
 function attemptLogin(){
-  const val = document.getElementById('gatePass').value;
-  if(val === DASH_PASSPHRASE){
-    sessionStorage.setItem(AUTH_KEY, '1');
-    unlockApp();
-  } else {
-    document.getElementById('gateError').style.display = 'block';
-  }
+  const email = document.getElementById('gateEmail').value.trim();
+  const pass = document.getElementById('gatePass').value;
+  document.getElementById('gateError').style.display = 'none';
+  const btn = document.getElementById('gateSubmit');
+  btn.disabled = true;
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(err=>{
+      document.getElementById('gateError').textContent = 'Sign-in failed: ' + err.message;
+      document.getElementById('gateError').style.display = 'block';
+    })
+    .finally(()=>{ btn.disabled = false; });
 }
+// Firebase persists the session itself (survives refresh) — this fires
+// on load and on every sign-in/sign-out.
+auth.onAuthStateChanged(user=>{
+  if(user){ unlockApp(); } else { lockApp(); }
+});
 function unlockApp(){
   document.getElementById('loginGate').style.display = 'none';
   document.getElementById('appShell').classList.add('on');
 }
-document.getElementById('logoutBtn').addEventListener('click', ()=>{
-  sessionStorage.removeItem(AUTH_KEY);
+function lockApp(){
   document.getElementById('appShell').classList.remove('on');
   document.getElementById('loginGate').style.display = 'flex';
   document.getElementById('gatePass').value = '';
+}
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  auth.signOut();
 });
 
 /* ============================================================
@@ -1435,94 +1415,30 @@ document.getElementById('importJsonBtn').addEventListener('click', ()=>{
 });
 
 /* ============================================================
-   API & SYNC (jsonbin.io)
+   API & SYNC (Firebase Firestore)
    ============================================================ */
-document.getElementById('saveApiBtn').addEventListener('click', ()=>{
-  CONFIG.apiKey = document.getElementById('api_key').value.trim();
-  CONFIG.binId = document.getElementById('api_binId').value.trim();
-  persistConfig();
-  if(CONFIG.apiKey && CONFIG.binId){
-    toast('API settings saved — pushing current data now…','success');
-    syncToApi();
-  } else {
-    setSync('local');
-    toast('API settings saved.','success');
-  }
-});
-
-async function jsonbinRequest(method, body){
-  if(!CONFIG.apiKey || !CONFIG.binId) throw new Error('Add an API key and Bin ID first.');
-  const url = 'https://api.jsonbin.io/v3/b/' + CONFIG.binId + (method==='GET' ? '/latest' : '');
-  const headers = { 'X-Master-Key': CONFIG.apiKey };
-  if(method !== 'GET'){ headers['Content-Type'] = 'application/json'; }
-  else { headers['X-Bin-Meta'] = 'false'; }
-  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  if(!res.ok){ throw new Error('Request failed (' + res.status + ')'); }
-  return res.json();
-}
-
-document.getElementById('testApiBtn').addEventListener('click', async ()=>{
-  CONFIG.apiKey = document.getElementById('api_key').value.trim();
-  CONFIG.binId = document.getElementById('api_binId').value.trim();
-  if(!CONFIG.apiKey || !CONFIG.binId){ toast('Enter an API key and Bin ID first.','error'); return; }
-  setSync('busy');
-  try{
-    await jsonbinRequest('GET');
-    setSync('synced');
-    toast('Connection successful.','success');
-  }catch(err){
-    setSync('error');
-    toast('Connection failed: ' + err.message, 'error');
-  }
-});
-
-document.getElementById('createBinBtn').addEventListener('click', async ()=>{
-  const key = document.getElementById('api_key').value.trim();
-  if(!key){ toast('Paste your API key first.','error'); return; }
-  setSync('busy');
-  try{
-    const res = await fetch('https://api.jsonbin.io/v3/b', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'X-Master-Key':key, 'X-Bin-Name':'gamil-portfolio-data' },
-      body: JSON.stringify(exportableData())
-    });
-    if(!res.ok) throw new Error('Request failed (' + res.status + ')');
-    const json = await res.json();
-    const binId = json.metadata && json.metadata.id;
-    if(!binId) throw new Error('No bin ID returned');
-    document.getElementById('api_binId').value = binId;
-    CONFIG.apiKey = key; CONFIG.binId = binId;
-    persistConfig();
-    setSync('synced');
-    toast('New bin created and connected.','success');
-  }catch(err){
-    setSync('error');
-    toast('Could not create bin: ' + err.message, 'error');
-  }
-});
-
-document.getElementById('pushApiBtn').addEventListener('click', async ()=>{
+document.getElementById('pushFirestoreBtn').addEventListener('click', async ()=>{
   clearTimeout(autoSyncTimer);
-  const ok = await syncToApi();
-  if(ok) toast('Pushed current data to the API.','success');
+  const ok = await syncToFirestore();
+  if(ok) toast('Pushed current data to Firestore.','success');
 });
-document.getElementById('pullApiBtn').addEventListener('click', async ()=>{
+document.getElementById('pullFirestoreBtn').addEventListener('click', async ()=>{
   setSync('busy');
   try{
-    const remote = await jsonbinRequest('GET');
-    DATA = Object.assign(defaultData(), remote);
+    const snap = await PORTFOLIO_DOC.get();
+    if(!snap.exists){ throw new Error('No document found yet — push first.'); }
+    DATA = Object.assign(defaultData(), snap.data());
     persistLocal();
     renderAll();
     setSync('synced');
-    toast('Pulled data from the API.','success');
+    toast('Pulled data from Firestore.','success');
   }catch(err){
     setSync('error');
     toast('Pull failed: ' + err.message, 'error');
   }
 });
 document.getElementById('syncNowBtn').addEventListener('click', ()=>{
-  if(CONFIG.apiKey && CONFIG.binId){ document.getElementById('pushApiBtn').click(); }
-  else { toast('Connect an API key and Bin ID on the API & Sync tab first.', 'error'); document.querySelector('.nav-item[data-panel="api"]').click(); }
+  document.getElementById('pushFirestoreBtn').click();
 });
 
 /* ============================================================
