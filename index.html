@@ -115,6 +115,13 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
   display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;
   font-family:var(--font-body);color:var(--white);font-size:.88rem;letter-spacing:0;
 }
+.file-field{background:var(--dark-light);border:1px solid var(--border);border-radius:9px;padding:12px}
+.file-empty{font-family:var(--font-mono);font-size:.76rem;color:var(--muted-2)}
+.file-chip{display:inline-flex;align-items:center;gap:8px;max-width:100%;color:var(--white);text-decoration:none}
+.file-chip img{width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);flex:none}
+.file-chip-pdf svg{width:40px;height:40px;padding:8px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border-strong);color:var(--electric-blue-bright);flex:none}
+.file-chip span{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-chip:hover span{color:var(--electric-blue-bright)}
 .switch-row input{display:none}
 .switch{width:38px;height:22px;border-radius:999px;background:var(--dark-light);border:1px solid var(--border-strong);position:relative;transition:.2s;flex:none}
 .switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:.2s}
@@ -297,7 +304,9 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
   .sidebar.open{transform:none}
   .mobile-topbar{display:flex}
   .content{padding:20px 16px 70px}
-  .topbar{padding:14px 16px}
+  .topbar{padding:10px 16px;justify-content:center}
+  .topbar > div:first-child{display:none}
+  .topbar-actions{width:100%;justify-content:center}
 }
 .sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:19}
 .sidebar-scrim.on{display:block}
@@ -410,7 +419,7 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
       <button class="btn-icon" id="menuToggle" aria-label="Open menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
-      <strong class="mono" style="font-size:.82rem">Dashboard</strong>
+      <strong class="mono" id="mobileTopTitle" style="font-size:.82rem">Dashboard</strong>
       <span></span>
     </div>
 
@@ -464,7 +473,7 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
         <div class="field">
           <label>Profile photo</label>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-            <div id="photoPreviewWrap" style="width:96px;height:96px;border-radius:50%;overflow:hidden;background:var(--dark-light);border:1px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center">
+            <div id="photoPreviewWrap" style="width:128px;height:128px;border-radius:50%;overflow:hidden;background:var(--dark-light);border:1px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center">
               <img id="photoPreview" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none">
               <span id="photoPreviewEmpty" style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted-2);text-align:center;padding:6px;letter-spacing:.04em">NO PHOTO</span>
             </div>
@@ -624,6 +633,7 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01e
 <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-storage-compat.js"></script>
 
 <script>
 /* ============================================================
@@ -645,6 +655,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 const PORTFOLIO_DOC = db.collection('portfolio').doc('content');
 /* ============================================================
    CONFIG
@@ -841,6 +852,7 @@ document.querySelectorAll('.nav-item[data-panel]').forEach(btn=>{
     document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', p.dataset.panel === btn.dataset.panel));
     document.getElementById('pageTitle').textContent = titles[btn.dataset.panel][0];
     document.getElementById('pageSub').textContent = titles[btn.dataset.panel][1];
+    document.getElementById('mobileTopTitle').textContent = titles[btn.dataset.panel][0];
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarScrim').classList.remove('on');
     if(btn.dataset.panel === 'export') refreshJsonPreview();
@@ -877,12 +889,92 @@ function fieldHtml(f, value){
     const v = Array.isArray(value) ? value.join(', ') : (value||'');
     return `<div class="field">${label}<input type="text" id="f_${f.key}" value="${esc(v)}" placeholder="${esc(f.placeholder||'Comma-separated')}">${hint || '<span class="hint">Comma-separated list.</span>'}</div>`;
   }
+  if(f.type === 'file'){
+    return `<div class="field">${label}
+      <input type="hidden" id="f_${f.key}" value="${esc(value||'')}">
+      <div class="file-field" id="filefield_${f.key}">
+        <div id="filepreview_${f.key}">${value ? fileChipHtml(value) : '<span class="file-empty">No file attached</span>'}</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="file" id="fileinput_${f.key}" accept="image/*,application/pdf" style="display:none">
+          <button type="button" class="btn btn-ghost btn-sm" id="filebtn_${f.key}">Upload file</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="fileremovebtn_${f.key}">Remove</button>
+        </div>
+      </div>
+      ${hint || '<span class="hint">Image or PDF, up to 10MB.</span>'}
+    </div>`;
+  }
   const type = f.type || 'text';
   return `<div class="field">${label}<input type="${type}" id="f_${f.key}" value="${esc(value||'')}" placeholder="${esc(f.placeholder||'')}">${hint}</div>`;
 }
+/* ------------------------------------------------------------
+   FILE UPLOADS (Firebase Storage)
+   Used by the 'file' field type above — for attaching a project
+   documentation file or a certificate image/PDF. The file itself
+   goes to Storage (not Firestore — a single Firestore document
+   is capped at ~1MB, far too small for PDFs/photos); only the
+   resulting public download URL is stored in the data.
+   ------------------------------------------------------------ */
+function fileKindFromUrl(url){
+  const clean = decodeURIComponent(url.split('?')[0]);
+  return /\.pdf$/i.test(clean) ? 'pdf' : 'image';
+}
+function fileNameFromUrl(url){
+  const clean = decodeURIComponent(url.split('?')[0]).split('/').pop() || 'file';
+  return clean.replace(/^\d+-[a-z0-9]+-/,'');
+}
+function fileChipHtml(url){
+  const kind = fileKindFromUrl(url);
+  const name = esc(fileNameFromUrl(url));
+  if(kind === 'image'){
+    return `<a href="${esc(url)}" target="_blank" rel="noopener" class="file-chip"><img src="${esc(url)}" alt=""><span>${name}</span></a>`;
+  }
+  return `<a href="${esc(url)}" target="_blank" rel="noopener" class="file-chip file-chip-pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 15h6M9 11h2"/></svg><span>${name}</span></a>`;
+}
+function wireFileField(key){
+  const btn = document.getElementById('filebtn_'+key);
+  const removeBtn = document.getElementById('fileremovebtn_'+key);
+  const input = document.getElementById('fileinput_'+key);
+  const hidden = document.getElementById('f_'+key);
+  const preview = document.getElementById('filepreview_'+key);
+  if(!btn || !input) return;
+  btn.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', async ()=>{
+    const file = input.files[0];
+    input.value = '';
+    if(!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if(!isImage && !isPdf){ toast('Please choose an image or PDF file.','error'); return; }
+    if(file.size > 10*1024*1024){ toast('That file is over 10MB — please use a smaller one.','error'); return; }
+    const originalLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Uploading…';
+    try{
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path = 'portfolio-assets/' + Date.now() + '-' + Math.random().toString(36).slice(2,7) + '-' + safeName;
+      const ref = storage.ref().child(path);
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      hidden.value = url;
+      preview.innerHTML = fileChipHtml(url);
+      toast('File uploaded.','success');
+    }catch(err){
+      toast('Upload failed: ' + err.message, 'error');
+    }finally{
+      btn.disabled = false; btn.textContent = originalLabel;
+    }
+  });
+  if(removeBtn){
+    removeBtn.addEventListener('click', ()=>{
+      hidden.value = '';
+      preview.innerHTML = '<span class="file-empty">No file attached</span>';
+    });
+  }
+}
+
 function openItemForm({title, schema, data, onSave}){
   document.getElementById('itemModalTitle').textContent = title;
   document.getElementById('itemModalBody').innerHTML = schema.map(f => fieldHtml(f, data ? data[f.key] : (f.type==='checkbox'? false : (f.type==='tags'?[]:'')))).join('');
+  schema.forEach(f => { if(f.type === 'file') wireFileField(f.key); });
   currentSave = { schema, onSave };
   document.getElementById('itemModal').classList.add('open');
   const firstInput = document.getElementById('itemModalBody').querySelector('input,textarea,select');
@@ -1163,7 +1255,8 @@ const projectsSchema = [
   { key:'featured', label:'Feature this project', type:'checkbox' },
   { key:'summary', label:'Short summary', type:'textarea', required:true },
   { key:'details', label:'Full details', type:'textarea', required:true },
-  { key:'tags', label:'Technologies / tags', type:'tags' }
+  { key:'tags', label:'Technologies / tags', type:'tags' },
+  { key:'docUrl', label:'Documentation (image or PDF)', type:'file', hint:'Datasheet, report, wiring diagram, screenshot, etc. Shown as a download link on the project.' }
 ];
 function renderProjectFilters(){
   const cats = ['All', ...new Set(DATA.projects.map(p=>p.category).filter(Boolean))];
@@ -1219,6 +1312,7 @@ const certSchema = [
   { key:'category', label:'Category', placeholder:'Embedded Systems / Robotics / Web / AI / Other' },
   { key:'credentialId', label:'Credential ID' },
   { key:'verifyUrl', label:'Verification URL', type:'url' },
+  { key:'fileUrl', label:'Certificate file (image or PDF)', type:'file', hint:'The certificate scan/photo/PDF itself. Shown as a download link on the portfolio.' },
   { key:'featured', label:'Feature this certificate', type:'checkbox' }
 ];
 function renderCertFilters(){
