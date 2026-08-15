@@ -643,6 +643,11 @@ const STORAGE_KEY = 'gm_dashboard_data_v1';
 const CONFIG_KEY  = 'gm_dashboard_config_v1';
 const AUTH_KEY    = 'gm_dashboard_auth_v1';
 
+// Must match JSONBIN_BIN_ID in index.html — this is what actually
+// links the two files together. Pre-fills the Bin ID field below so
+// you only have to paste your Access Key to connect.
+const DEFAULT_BIN_ID = '6a7c5facda38895dfeda4195';
+
 /* ============================================================
    DEFAULT DATA — mirrors the portfolio's DATA object 1:1 so the
    exported JSON can be pasted straight back into it.
@@ -739,6 +744,41 @@ function setSync(state){
 }
 
 /* ============================================================
+   AUTO-SYNC
+   ------------------------------------------------------------
+   Every edit still saves to localStorage immediately (persistLocal,
+   so nothing is lost on refresh even offline), but it now ALSO
+   pushes to the JSONBin API automatically — that push is what was
+   previously missing, which is why edits used to stay local until
+   someone clicked "Push to API" by hand.
+
+   The push is debounced (700ms of no further edits) so rapid
+   changes, like reordering several items, collapse into a single
+   API request instead of firing one per click.
+   ============================================================ */
+let autoSyncTimer = null;
+async function syncToApi(){
+  if(!(CONFIG.apiKey && CONFIG.binId)) return false;
+  setSync('busy');
+  try{
+    await jsonbinRequest('PUT', exportableData());
+    setSync('synced');
+    return true;
+  }catch(err){
+    setSync('error');
+    toast('Auto-sync to API failed: ' + err.message, 'error');
+    return false;
+  }
+}
+function commit(){
+  persistLocal();
+  if(!(CONFIG.apiKey && CONFIG.binId)) return; // nothing to sync to yet — local only, as expected
+  clearTimeout(autoSyncTimer);
+  setSync('busy');
+  autoSyncTimer = setTimeout(syncToApi, 700);
+}
+
+/* ============================================================
    INIT / LOGIN
    ============================================================ */
 function boot(){
@@ -747,6 +787,7 @@ function boot(){
   if(!DATA.seo) DATA.seo = { title:'', desc:'', image:'' };
   const savedConfig = localStorage.getItem(CONFIG_KEY);
   CONFIG = savedConfig ? JSON.parse(savedConfig) : { apiKey:'', binId:'' };
+  if(!CONFIG.binId) CONFIG.binId = DEFAULT_BIN_ID;
 
   document.getElementById('api_key').value = CONFIG.apiKey || '';
   document.getElementById('api_binId').value = CONFIG.binId || '';
@@ -927,7 +968,7 @@ document.getElementById('saveProfileBtn').addEventListener('click', ()=>{
   const email = document.getElementById('p_email').value.trim();
   if(!name || !shortName || !email){ toast('Please fill in all profile fields.','error'); return; }
   DATA.profile = { name, shortName, email };
-  persistLocal();
+  commit();
   toast('Profile saved.','success');
 });
 
@@ -953,11 +994,11 @@ function renderEducationList(){
       <div class="item-desc">${esc(item.body)}</div>
       <div class="item-tags">${(item.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div></div>`;
     card.appendChild(actionButtons({
-      onUp: i>0 ? ()=>{ moveItem(DATA.education,i,-1); persistLocal(); renderEducationList(); } : null,
-      onDown: i<DATA.education.length-1 ? ()=>{ moveItem(DATA.education,i,1); persistLocal(); renderEducationList(); } : null,
-      onEdit: ()=> openItemForm({ title:'Edit journey entry', schema:educationSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); persistLocal(); renderEducationList(); toast('Entry updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this entry?', item.title, ()=>{ DATA.education.splice(i,1); persistLocal(); renderEducationList(); toast('Entry deleted.'); }),
-      onFeature: ()=>{ item.featured = !item.featured; persistLocal(); renderEducationList(); },
+      onUp: i>0 ? ()=>{ moveItem(DATA.education,i,-1); commit(); renderEducationList(); } : null,
+      onDown: i<DATA.education.length-1 ? ()=>{ moveItem(DATA.education,i,1); commit(); renderEducationList(); } : null,
+      onEdit: ()=> openItemForm({ title:'Edit journey entry', schema:educationSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); commit(); renderEducationList(); toast('Entry updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this entry?', item.title, ()=>{ DATA.education.splice(i,1); commit(); renderEducationList(); toast('Entry deleted.'); }),
+      onFeature: ()=>{ item.featured = !item.featured; commit(); renderEducationList(); },
       featured:item.featured
     }));
     wrap.appendChild(card);
@@ -966,7 +1007,7 @@ function renderEducationList(){
 document.getElementById('addEducationBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add journey entry', schema:educationSchema, data:null, onSave:(vals)=>{
     DATA.education.push({ id:uid('edu'), ...vals });
-    persistLocal(); renderEducationList(); toast('Entry added.','success');
+    commit(); renderEducationList(); toast('Entry added.','success');
   }});
 });
 
@@ -995,10 +1036,10 @@ function renderSkillsList(){
       <div class="item-sub">${esc(item.desc||'')}</div>
       <div class="item-tags">${(item.items||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div></div>`;
     card.appendChild(actionButtons({
-      onUp: i>0 ? ()=>{ moveItem(DATA.skills,i,-1); persistLocal(); renderSkillsList(); } : null,
-      onDown: i<DATA.skills.length-1 ? ()=>{ moveItem(DATA.skills,i,1); persistLocal(); renderSkillsList(); } : null,
-      onEdit: ()=> openItemForm({ title:'Edit skill category', schema:skillsSchema, data:item, onSave:(vals)=>{ item.key = slugKey(vals.name); Object.assign(item, vals); persistLocal(); renderSkillsList(); toast('Category updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this category?', item.name, ()=>{ DATA.skills.splice(i,1); persistLocal(); renderSkillsList(); toast('Category deleted.'); })
+      onUp: i>0 ? ()=>{ moveItem(DATA.skills,i,-1); commit(); renderSkillsList(); } : null,
+      onDown: i<DATA.skills.length-1 ? ()=>{ moveItem(DATA.skills,i,1); commit(); renderSkillsList(); } : null,
+      onEdit: ()=> openItemForm({ title:'Edit skill category', schema:skillsSchema, data:item, onSave:(vals)=>{ item.key = slugKey(vals.name); Object.assign(item, vals); commit(); renderSkillsList(); toast('Category updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this category?', item.name, ()=>{ DATA.skills.splice(i,1); commit(); renderSkillsList(); toast('Category deleted.'); })
     }));
     wrap.appendChild(card);
   });
@@ -1006,7 +1047,7 @@ function renderSkillsList(){
 document.getElementById('addSkillBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add skill category', schema:skillsSchema, data:null, onSave:(vals)=>{
     DATA.skills.push({ key:slugKey(vals.name), ...vals });
-    persistLocal(); renderSkillsList(); toast('Category added.','success');
+    commit(); renderSkillsList(); toast('Category added.','success');
   }});
 });
 
@@ -1025,10 +1066,10 @@ function renderServicesList(){
     const card = el('div','item-card');
     card.innerHTML = `<div class="item-main"><h4>${esc(item.name)}</h4><div class="item-desc">${esc(item.desc)}</div></div>`;
     card.appendChild(actionButtons({
-      onUp: i>0 ? ()=>{ moveItem(DATA.services,i,-1); persistLocal(); renderServicesList(); } : null,
-      onDown: i<DATA.services.length-1 ? ()=>{ moveItem(DATA.services,i,1); persistLocal(); renderServicesList(); } : null,
-      onEdit: ()=> openItemForm({ title:'Edit service', schema:servicesSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); persistLocal(); renderServicesList(); toast('Service updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this service?', item.name, ()=>{ DATA.services.splice(i,1); persistLocal(); renderServicesList(); toast('Service deleted.'); })
+      onUp: i>0 ? ()=>{ moveItem(DATA.services,i,-1); commit(); renderServicesList(); } : null,
+      onDown: i<DATA.services.length-1 ? ()=>{ moveItem(DATA.services,i,1); commit(); renderServicesList(); } : null,
+      onEdit: ()=> openItemForm({ title:'Edit service', schema:servicesSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); commit(); renderServicesList(); toast('Service updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this service?', item.name, ()=>{ DATA.services.splice(i,1); commit(); renderServicesList(); toast('Service deleted.'); })
     }));
     wrap.appendChild(card);
   });
@@ -1036,7 +1077,7 @@ function renderServicesList(){
 document.getElementById('addServiceBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add service', schema:servicesSchema, data:null, onSave:(vals)=>{
     DATA.services.push({ ...vals });
-    persistLocal(); renderServicesList(); toast('Service added.','success');
+    commit(); renderServicesList(); toast('Service added.','success');
   }});
 });
 
@@ -1079,9 +1120,9 @@ function renderProjectsList(){
       <div class="item-desc">${esc(item.summary)}</div>
       <div class="item-tags">${(item.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div></div>`;
     card.appendChild(actionButtons({
-      onEdit: ()=> openItemForm({ title:'Edit project', schema:projectsSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); persistLocal(); renderProjectFilters(); renderProjectsList(); toast('Project updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this project?', item.title, ()=>{ DATA.projects.splice(i,1); persistLocal(); renderProjectFilters(); renderProjectsList(); toast('Project deleted.'); }),
-      onFeature: ()=>{ item.featured=!item.featured; persistLocal(); renderProjectsList(); },
+      onEdit: ()=> openItemForm({ title:'Edit project', schema:projectsSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); commit(); renderProjectFilters(); renderProjectsList(); toast('Project updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this project?', item.title, ()=>{ DATA.projects.splice(i,1); commit(); renderProjectFilters(); renderProjectsList(); toast('Project deleted.'); }),
+      onFeature: ()=>{ item.featured=!item.featured; commit(); renderProjectsList(); },
       featured:item.featured
     }));
     wrap.appendChild(card);
@@ -1090,7 +1131,7 @@ function renderProjectsList(){
 document.getElementById('addProjectBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add project', schema:projectsSchema, data:null, onSave:(vals)=>{
     DATA.projects.push({ id:uid('proj'), ...vals });
-    persistLocal(); renderProjectFilters(); renderProjectsList(); toast('Project added.','success');
+    commit(); renderProjectFilters(); renderProjectsList(); toast('Project added.','success');
   }});
 });
 document.getElementById('projectSearch').addEventListener('input', renderProjectsList);
@@ -1141,9 +1182,9 @@ function renderCertList(){
       <div class="item-sub">${esc(item.issuer||'')}${item.date?' · '+esc(item.date):''}${item.category?' · '+esc(item.category):''}</div>
       ${item.verifyUrl?`<div class="item-tags"><span class="chip">🔗 ${esc(item.verifyUrl)}</span></div>`:''}</div>`;
     card.appendChild(actionButtons({
-      onEdit: ()=> openItemForm({ title:'Edit certificate', schema:certSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); persistLocal(); renderCertFilters(); renderCertList(); toast('Certificate updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this certificate?', item.name, ()=>{ DATA.certificates.splice(i,1); persistLocal(); renderCertFilters(); renderCertList(); toast('Certificate deleted.'); }),
-      onFeature: ()=>{ item.featured=!item.featured; persistLocal(); renderCertList(); },
+      onEdit: ()=> openItemForm({ title:'Edit certificate', schema:certSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); commit(); renderCertFilters(); renderCertList(); toast('Certificate updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this certificate?', item.name, ()=>{ DATA.certificates.splice(i,1); commit(); renderCertFilters(); renderCertList(); toast('Certificate deleted.'); }),
+      onFeature: ()=>{ item.featured=!item.featured; commit(); renderCertList(); },
       featured:item.featured
     }));
     wrap.appendChild(card);
@@ -1152,7 +1193,7 @@ function renderCertList(){
 document.getElementById('addCertBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add certificate', schema:certSchema, data:null, onSave:(vals)=>{
     DATA.certificates.push({ id:uid('cert'), ...vals });
-    persistLocal(); renderCertFilters(); renderCertList(); toast('Certificate added.','success');
+    commit(); renderCertFilters(); renderCertList(); toast('Certificate added.','success');
   }});
 });
 document.getElementById('certSearch').addEventListener('input', renderCertList);
@@ -1173,10 +1214,10 @@ function renderStatsList(){
     const card = el('div','item-card');
     card.innerHTML = `<div class="item-main"><h4>${esc(item.value)}${esc(item.suffix)}</h4><div class="item-sub">${esc(item.label)}</div></div>`;
     card.appendChild(actionButtons({
-      onUp: i>0 ? ()=>{ moveItem(DATA.stats,i,-1); persistLocal(); renderStatsList(); } : null,
-      onDown: i<DATA.stats.length-1 ? ()=>{ moveItem(DATA.stats,i,1); persistLocal(); renderStatsList(); } : null,
-      onEdit: ()=> openItemForm({ title:'Edit stat', schema:statsSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); persistLocal(); renderStatsList(); toast('Stat updated.','success'); } }),
-      onDelete: ()=> askConfirm('Delete this stat?', item.label, ()=>{ DATA.stats.splice(i,1); persistLocal(); renderStatsList(); toast('Stat deleted.'); })
+      onUp: i>0 ? ()=>{ moveItem(DATA.stats,i,-1); commit(); renderStatsList(); } : null,
+      onDown: i<DATA.stats.length-1 ? ()=>{ moveItem(DATA.stats,i,1); commit(); renderStatsList(); } : null,
+      onEdit: ()=> openItemForm({ title:'Edit stat', schema:statsSchema, data:item, onSave:(vals)=>{ Object.assign(item, vals); commit(); renderStatsList(); toast('Stat updated.','success'); } }),
+      onDelete: ()=> askConfirm('Delete this stat?', item.label, ()=>{ DATA.stats.splice(i,1); commit(); renderStatsList(); toast('Stat deleted.'); })
     }));
     wrap.appendChild(card);
   });
@@ -1184,7 +1225,7 @@ function renderStatsList(){
 document.getElementById('addStatBtn').addEventListener('click', ()=>{
   openItemForm({ title:'Add stat', schema:statsSchema, data:null, onSave:(vals)=>{
     DATA.stats.push({ ...vals });
-    persistLocal(); renderStatsList(); toast('Stat added.','success');
+    commit(); renderStatsList(); toast('Stat added.','success');
   }});
 });
 
@@ -1202,7 +1243,7 @@ document.getElementById('saveSeoBtn').addEventListener('click', ()=>{
     desc: document.getElementById('seo_desc').value.trim(),
     image: document.getElementById('seo_image').value.trim()
   };
-  persistLocal();
+  commit();
   toast('SEO settings saved.','success');
 });
 
@@ -1292,7 +1333,7 @@ document.getElementById('importJsonBtn').addEventListener('click', ()=>{
     const parsed = JSON.parse(raw);
     if(!parsed.profile || !Array.isArray(parsed.projects)){ throw new Error('shape'); }
     DATA = Object.assign(defaultData(), parsed);
-    persistLocal();
+    commit();
     renderAll();
     toast('Data imported.','success');
   }catch(err){
@@ -1307,8 +1348,13 @@ document.getElementById('saveApiBtn').addEventListener('click', ()=>{
   CONFIG.apiKey = document.getElementById('api_key').value.trim();
   CONFIG.binId = document.getElementById('api_binId').value.trim();
   persistConfig();
-  setSync('local');
-  toast('API settings saved.','success');
+  if(CONFIG.apiKey && CONFIG.binId){
+    toast('API settings saved — pushing current data now…','success');
+    syncToApi();
+  } else {
+    setSync('local');
+    toast('API settings saved.','success');
+  }
 });
 
 async function jsonbinRequest(method, body){
@@ -1363,15 +1409,9 @@ document.getElementById('createBinBtn').addEventListener('click', async ()=>{
 });
 
 document.getElementById('pushApiBtn').addEventListener('click', async ()=>{
-  setSync('busy');
-  try{
-    await jsonbinRequest('PUT', exportableData());
-    setSync('synced');
-    toast('Pushed current data to the API.','success');
-  }catch(err){
-    setSync('error');
-    toast('Push failed: ' + err.message, 'error');
-  }
+  clearTimeout(autoSyncTimer);
+  const ok = await syncToApi();
+  if(ok) toast('Pushed current data to the API.','success');
 });
 document.getElementById('pullApiBtn').addEventListener('click', async ()=>{
   setSync('busy');
