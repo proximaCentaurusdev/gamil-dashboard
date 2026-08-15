@@ -938,7 +938,7 @@ function wireFileField(key){
   const preview = document.getElementById('filepreview_'+key);
   if(!btn || !input) return;
   btn.addEventListener('click', ()=> input.click());
-  input.addEventListener('change', async ()=>{
+  input.addEventListener('change', ()=>{
     const file = input.files[0];
     input.value = '';
     if(!file) return;
@@ -946,22 +946,57 @@ function wireFileField(key){
     const isPdf = file.type === 'application/pdf';
     if(!isImage && !isPdf){ toast('Please choose an image or PDF file.','error'); return; }
     if(file.size > 10*1024*1024){ toast('That file is over 10MB — please use a smaller one.','error'); return; }
+    if(!auth.currentUser){ toast('You need to be signed in to upload files.','error'); return; }
+
     const originalLabel = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Uploading…';
-    try{
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      const path = 'portfolio-assets/' + Date.now() + '-' + Math.random().toString(36).slice(2,7) + '-' + safeName;
-      const ref = storage.ref().child(path);
-      await ref.put(file);
-      const url = await ref.getDownloadURL();
-      hidden.value = url;
-      preview.innerHTML = fileChipHtml(url);
-      toast('File uploaded.','success');
-    }catch(err){
-      toast('Upload failed: ' + err.message, 'error');
-    }finally{
+    btn.disabled = true;
+    btn.textContent = 'Uploading… 0%';
+
+    // Safety net: if Storage never calls back at all (e.g. it hasn't been
+    // enabled for this project yet), don't leave the button stuck forever.
+    const stallTimer = setTimeout(()=>{
       btn.disabled = false; btn.textContent = originalLabel;
-    }
+      toast('Upload is taking too long — check that Storage is enabled for this project (Build → Storage → Get started) and its Rules are published.', 'error');
+    }, 20000);
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = 'portfolio-assets/' + Date.now() + '-' + Math.random().toString(36).slice(2,7) + '-' + safeName;
+    const ref = storage.ref().child(path);
+    const task = ref.put(file);
+
+    task.on('state_changed',
+      (snapshot)=>{
+        clearTimeout(stallTimer);
+        const pct = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+        btn.textContent = 'Uploading… ' + pct + '%';
+      },
+      (err)=>{
+        clearTimeout(stallTimer);
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        let msg = err.message;
+        if(err.code === 'storage/unauthorized'){
+          msg = 'Permission denied — make sure Storage Rules are published (see storage.rules) and that you are signed in.';
+        } else if(err.code === 'storage/unknown' || err.code === 'storage/retry-limit-exceeded'){
+          msg = "Couldn't reach Firebase Storage — make sure it's enabled for this project (Build → Storage → Get started in the Firebase console).";
+        }
+        toast('Upload failed: ' + msg, 'error');
+      },
+      async ()=>{
+        clearTimeout(stallTimer);
+        try{
+          const url = await task.snapshot.ref.getDownloadURL();
+          hidden.value = url;
+          preview.innerHTML = fileChipHtml(url);
+          toast('File uploaded.','success');
+        }catch(err){
+          toast('Upload finished but the file link could not be read: ' + err.message, 'error');
+        }finally{
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
+      }
+    );
   });
   if(removeBtn){
     removeBtn.addEventListener('click', ()=>{
